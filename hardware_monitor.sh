@@ -3,6 +3,7 @@
 #############################################
 # Version Information
 #
+#   v1.5 output sensor's min/avg/max latency
 #   v1.4
 #        add ddr clock setup and view ddr load info
 #        Display the average value of the load/temp/fps etc.
@@ -14,7 +15,7 @@
 #
 #############################################
 
-version=1.4
+version=1.5
 loop_delay=1
 loop_count=0
 max_loop_number=0
@@ -36,6 +37,10 @@ app_fps_total=0
 atw_fps_total=0
 left_total=0
 
+sensor_min_total=0
+sensor_avg_total=0
+sensor_max_total=0
+
 vpu_freq_total=0
 hevc_freq_total=0
 
@@ -46,13 +51,14 @@ new_cpu_clk=0
 new_gpu_clk=0
 new_ddr_clk=0
 
-title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS(app/atw/left)"
+title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
 
 do_exit()
 {
     echo ""
     setprop debug.sf.fps 0
     setprop sys.vr.log 0
+#    setprop sensor.debug.time 0
 #    loop_count=$(($loop_count-1))
 #    echo "loop count=$loop_count"
     if [ $loop_count -eq 0 ]; then
@@ -79,13 +85,19 @@ do_exit()
     vpu_freq_avg=`echo "$vpu_freq_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
     hevc_freq_avg=`echo "$hevc_freq_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
     
-    echo "------------------------------------------------------------------------"
+    sensor_min_avg=`echo "$sensor_min_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+    sensor_avg_avg=`echo "$sensor_avg_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+    sensor_max_avg=`echo "$sensor_max_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+    
+    #echo "------------------------------------------------------------------------"
     let new_cpu_clk=$new_cpu_clk/1000
     let new_gpu_clk=$new_gpu_clk/1000
     let new_ddr_clk=$new_ddr_clk/1000000
 
     echo $title_str
-    echo "Average($loop_count):\t$cpu_freq_avg/$cpu_load_avg/$cpu_temp_avg\t$gpu_freq_avg/$gpu_load_avg/$gpu_temp_avg\t$vpu_freq_avg/$hevc_freq_avg\t\t$ddr_freq_avg/$ddr_load_avg\t\t$app_fps_avg/$atw_fps_avg/$left_avg"
+    #echo "Average($loop_count):\t$cpu_freq_avg/$cpu_load_avg/$cpu_temp_avg\t$gpu_freq_avg/$gpu_load_avg/$gpu_temp_avg\t$vpu_freq_avg/$hevc_freq_avg\t\t$ddr_freq_avg/$ddr_load_avg\t\t$sensor_min_avg/$sensor_avg_avg/$sensor_max_avg\t$app_fps_avg/$atw_fps_avg/$left_avg"
+    busybox printf "Average(%d):\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%.1f\n" $loop_count $cpu_freq_avg $cpu_load_avg $cpu_temp_avg $gpu_freq_avg $gpu_load_avg $gpu_temp_avg $vpu_freq_avg $hevc_freq_avg $ddr_freq_avg $ddr_load_avg $sensor_min_avg $sensor_avg_avg $sensor_max_avg $app_fps_avg $atw_fps_avg $left_avg
+
     echo "Fixed freq: CPU=$new_cpu_clk GPU=$new_gpu_clk DDR=$new_ddr_clk"
     #echo "CPU Load(avg): $cpu_load_avg"
     #echo "GPU Load(avg): $gpu_load_avg"
@@ -110,10 +122,17 @@ echo ""
 #do
 #    echo $curr
 #done
+shwo_usage()
+{
+echo ""
+echo "Usage: $0 [OPTION]..."
+echo "  -C clock\t\tSetup CPU frequency at MHz"
+echo "  -G clock\t\tSetup GPU frequency at MHz"
+echo "  -D clock\t\tSetup DDR frequency at MHz"
+echo "  -n num\t\tLoop count"
+}
 
-new_cpu_clk=0
-new_gpu_clk=0
-while getopts "n:C:D:G:" arg
+while getopts "n:C:D:G:V:" arg
 do
     case $arg in
         C)
@@ -160,7 +179,7 @@ do
             let max_loop_number=$OPTARG
             ;;
         ?)
-            echo "unkonw argument"
+            shwo_usage
             exit 1
             ;;
     esac
@@ -170,10 +189,12 @@ echo ""
 #echo $title_str
 setprop debug.sf.fps 1
 setprop sys.vr.log 1
+setprop sensor.debug.time 1
 
 time_begin=$((`date +%s`+2))
 
 last_log_date=`date '+%m-%d %H:%M:%S.000'`
+sensor_log_date=$last_log_date
 #echo "last_log_date=$last_log_date"
 
 while true
@@ -280,7 +301,7 @@ END{
 
 atw_fps=0
 left_count=0
-eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*atw" | busybox awk '
+eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*atw" | grep -v "direct=" | busybox awk '
 BEGIN{left_c=0;s=0}
 {
     i=index($0,"fps=");
@@ -301,17 +322,53 @@ END{
 }
 ')
 
+eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*direct.*fps" | busybox awk '
+END{
+    i=index($0,"fps=");
+    if(i>0) {
+        s=substr($0,i+length("fps="));
+        printf("app_fps=%s;", s);
+        printf("atw_fps=%d;", 0);
+        printf("left_count=%d;", 0);
+    }
+}
+')
+
 #logcat -v time -t "$aaa" | grep -E "VRJni.*atw" | busybox awk '{print $0;}END{printf("Last: %s\n", $0);}'
 #echo "atw_fps=$atw_fps, left_count=$left_count, last_log_date=$last_log_date"
 #eval $(logcat -v time -t "$last_log_date" | grep -E "VRJni.*atw.*fps" | busybox awk '{i=index($0,"fps="); if(i>0){s=substr($0,i+length("fps=")); printf("atw_fps=%s;",s);}}')
 #left_count=`logcat -t "$last_log_date" | grep -c -E "VRJni.*atw.*#left"`
 #last_log_date=`date '+%m-%d %H:%M:%S.000'`
 
+sensor_min=0
+sensor_avg=0
+sensor_max=0
+eval $(logcat -v time -t "$sensor_log_date" | grep -E "SensorManager.*Client Time" | busybox awk '
+END{
+    i=index($0,"] ");
+    if(i>0) {
+        s=substr($0,i+length("] "));
+        #printf("sensor_latency=%s;",s);
+        split(s, sl, ",");
+        #printf("sensor_latency=%d/%d/%d;", sl[1]/1000,sl[2]/1000,sl[3]/1000);
+        printf("sensor_min=%d;", sl[1]/1000);
+        printf("sensor_avg=%d;", sl[2]/1000);
+        printf("sensor_max=%d;", sl[3]/1000);
+        split($2, tm, ":");
+        tm[3] += 0.001;
+        printf("sensor_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
+    }
+}
+')
+#echo "sensor_delay=$sensor_delay, sensor_log_date=$sensor_log_date"
+
 if [ $(($loop_count%20)) -eq 0 ]; then
     echo $title_str
 fi
 
-echo "$up_time\t$cpu_freq/$cpu_load/$cpu_temp\t$gpu_freq/$gpu_load/$gpu_temp\t$vdpu_freq/$hevc_freq\t\t$ddr_freq/$ddr_load\t\t$app_fps/$atw_fps/$left_count"
+#echo "$up_time\t$cpu_freq/$cpu_load/$cpu_temp\t$gpu_freq/$gpu_load/$gpu_temp\t$vdpu_freq/$hevc_freq\t\t$ddr_freq/$ddr_load\t\t$sensor_min/$sensor_avg/$sensor_max\t$app_fps/$atw_fps/$left_count"
+
+busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%d\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $sensor_min $sensor_avg $sensor_max $app_fps $atw_fps $left_count
 
 cpu_load_total=$(($cpu_load_total+$cpu_load))
 cpu_freq_total=$(($cpu_freq_total+$cpu_freq))
@@ -331,6 +388,10 @@ left_total=$(($left_total+$left_count))
 vpu_freq_total=$(($vpu_freq_total+$vdpu_freq))
 hevc_freq_total=$(($hevc_freq_total+$hevc_freq))
 
+sensor_min_total=$(($sensor_min_total+$sensor_min))
+sensor_avg_total=$(($sensor_avg_total+$sensor_avg))
+sensor_max_total=$(($sensor_max_total+$sensor_max))
+
 loop_count=$(($loop_count+1))
 
 if [ $loop_count -eq $max_loop_number ]; then
@@ -340,4 +401,3 @@ fi
 sleep $loop_delay
 done
 do_exit
-
