@@ -3,13 +3,15 @@
 #############################################
 # Version Information
 #
-#   v1.2 support vpu clock
+#   v1.3 add cpu/gpu clocks setup
+#        hardware_monitor.sh -c 816 -g 297 # CPU=816MHz, GPU=297MHz
+#   v1.2 support vpu clock show
 #   v1.1 support rk vr's FPS
 #   v1.0 first version
 #
 #############################################
 
-version=1.2
+version=1.3
 loop_delay=1
 old_cpu_use=0
 old_cpu_total=0
@@ -26,9 +28,50 @@ echo "[Model]: "`getprop ro.product.model`
 echo "[Firmware]: "`getprop ro.build.description`
 echo "[Kernel]: "`cat /proc/version`
 echo ""
+
+#dmesg -t | grep '|-' | while read curr
+#do
+#    echo $curr
+#done
+
+new_cpu_clk=0
+new_gpu_clk=0
+while getopts "c:g:" arg
+do
+    case $arg in
+        c)
+            echo "Set CPU clock: $OPTARG MHz"
+            let new_cpu_clk=$OPTARG*1000
+            if [ "$new_cpu_clk" -eq "0" ]
+            then
+                echo "interactive" > /sys/bus/cpu/devices/cpu0/cpufreq/scaling_governor
+            else
+                echo "userspace" > /sys/bus/cpu/devices/cpu0/cpufreq/scaling_governor
+                echo $new_cpu_clk > /sys/bus/cpu/devices/cpu0/cpufreq/scaling_setspeed
+            fi
+            echo "";;
+        g)
+            echo "Set GPU clock: $OPTARG MHz"
+            let new_gpu_clk=$OPTARG*1000
+            if [ "$new_gpu_clk" -eq "0" ]
+            then
+                echo "on" > /sys/devices/ffa30000.gpu/dvfs
+            else
+                echo "off" > /sys/devices/ffa30000.gpu/dvfs
+                echo $new_gpu_clk> /sys/devices/ffa30000.gpu/clock
+            fi
+            echo "";;
+        ?)
+            echo "unkonw argument"
+            exit 1
+            ;;
+    esac
+done
+
 echo $title_str
 setprop debug.sf.fps 1
 setprop sys.vr.log 1
+
 while true
 do
 gpu_load=0
