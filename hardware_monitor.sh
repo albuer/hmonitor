@@ -4,6 +4,7 @@
 #
 # Version Information
 #
+#   v1.7 Compatible RK3399@Linux4.4, and use function rewrite code
 #   v1.6 disable VR mode by default, use "-V" to enable it.
 #   v1.5 output sensor's min/avg/max latency
 #   v1.4
@@ -58,6 +59,215 @@ new_ddr_clk=0
 
 vr_mode=0
 
+get_cpu_info()
+{
+    cpu_freq=0
+    cpu_load=0
+    cpu_temp=0
+
+    if [ -f "/sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq" ]; then
+        cpu_freq=`cat /sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq`
+        cpu_freq=$(($cpu_freq/1000))
+    fi
+
+    eval $(cat /proc/stat | grep "cpu " | busybox awk '
+    {
+        printf("cpu_use=%d; cpu_total=%d;",$2+$3+$4+$6+$7+$8, $2+$3+$4+$5+$6+$7+$8)
+    }
+    ')
+    cpu_load=$((($cpu_use-$prev_cpu_use)*100/($cpu_total-$prev_cpu_total)))
+
+    if [ -f "/sys/devices/ff280000.tsadc/temp1_input" ]; then # rk3288
+        cpu_temp=`cat /sys/devices/ff280000.tsadc/temp1_input`
+    elif [ -f "/sys/devices/11150000.tsadc/temp0_input" ]; then # rk3228
+        cpu_temp=`cat /sys/devices/11150000.tsadc/temp0_input`
+    elif [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then # rk3399 @ linux4.4
+        cpu_temp=`cat /sys/class/thermal/thermal_zone0/temp`
+        cpu_temp=$(($cpu_temp/1000))
+    fi
+}
+
+get_gpu_info()
+{
+    gpu_freq=0
+    gpu_load=0
+    gpu_temp=0
+
+    if [ -f "/sys/devices/ffa30000.gpu/dvfs" ]; then
+        eval $(cat /sys/devices/ffa30000.gpu/dvfs | busybox awk '
+        {
+        if($1=="current_gpu_clk_freq")
+            printf("gpu_freq=%d;", $3);
+        if($1=="gpu_utilisation")
+            printf("gpu_load=%d;", $3); 
+        if($5=="gpu_utilisation")
+            printf("gpu_load=%d;", $7);
+        }
+        ')
+    elif [ -f "/sys/devices/platform/ff9a0000.gpu/devfreq/ff9a0000.gpu/load" ]; then
+        eval $(cat /sys/devices/platform/*.gpu/devfreq/*.gpu/load | busybox awk -F@ '
+        {
+            printf("gpu_load=%d;", $1);
+            printf("gpu_freq=%d;", ($2+0)/1000000);
+        }')
+    fi
+
+    if [ -f "/sys/devices/ff280000.tsadc/temp2_input" ]; then
+        gpu_temp=`cat /sys/devices/ff280000.tsadc/temp2_input`
+    elif [ -f "/sys/class/thermal/thermal_zone1/temp" ]; then # rk3399 @ linux4.4
+        gpu_temp=`cat /sys/class/thermal/thermal_zone1/temp`
+        gpu_temp=$(($gpu_temp/1000))
+    fi
+}
+
+get_ddr_info()
+{
+    ddr_freq=0
+    eval $(cat /d/clk/clk_summary | grep sclk_ddrc | busybox awk '{printf("ddr_freq=%d;", $4/1000000);}') # rk3399 @ linux4.4
+    if [ $ddr_freq == 0 ]; then
+        eval $(cat /d/clk/clk_summary | grep ddr | busybox awk '{printf("ddr_freq=%d;", $4/1000000);}')
+    fi
+
+    ddr_load='0'
+    if [ -f "/sys/pm_tests/ddrfreq" ]; then
+        eval $(cat /sys/pm_tests/ddrfreq | grep "curr_load:" | busybox awk '{printf("ddr_load=%d;", $2);}')
+    fi
+}
+
+get_vpu_info()
+{
+    vdpu_freq=0
+    eval $(cat /d/clk/clk_summary | grep " clk_vdpu" | busybox awk '
+    {
+        if($2<=0)
+            printf("vdpu_freq=%d;", 0);
+        else
+            printf("vdpu_freq=%d;", $4/1000000);
+    }
+    ')
+    if [ $vdpu_freq == 0 ]; then
+    eval $(cat /d/clk/clk_summary | grep " aclk_vpu" | busybox awk '
+    {
+        if($2<=0)
+            printf("vdpu_freq=%d;", 0);
+        else
+            printf("vdpu_freq=%d;", $4/1000000);
+    }
+    ')
+    fi
+    if [ $vdpu_freq == 0 ]; then
+    eval $(cat /d/clk/clk_summary | grep " aclk_vcodec" | busybox awk '# 3399@Linux4.4
+    {
+        if($2<=0)
+            printf("vdpu_freq=%d;", 0);
+        else
+            printf("vdpu_freq=%d;", $4/1000000);
+    }
+    ')
+    fi
+
+    hevc_freq=0
+    eval $(cat /d/clk/clk_summary | grep " clk_hevc_core" | busybox awk '
+    {
+        if($2<=0)
+            printf("hevc_freq=%d;", 0);
+        else
+            printf("hevc_freq=%d;", $4/1000000);
+    }
+    ')
+}
+
+get_disp_fps()
+{
+    app_fps=0
+    log_date=$last_log_date
+
+    eval $(logcat -v time -t "$log_date" | grep -E "SurfaceFlinger.*mFps" | busybox awk '
+    END{
+        i=index($0,"mFps = ");
+        if(i>0) {
+            s=substr($0,i+length("mFps = "));
+            printf("app_fps=%s;",s);
+            split($2, tm, ":");
+            tm[3] += 0.001;
+            printf("last_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
+        }
+    }
+    ')
+}
+
+get_vr_fps()
+{
+    eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*app.*FPS" | busybox awk '
+    END{
+        i=index($0,"FPS=");
+        if(i>0) {
+            s=substr($0,i+length("FPS="));
+            printf("app_fps=%s;",s);
+        }
+    }
+    ')
+
+    atw_fps=0
+    left_count=0
+    eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*atw" | grep -v "direct=" | busybox awk '
+    BEGIN{left_c=0;s=0}
+    {
+        i=index($0,"fps=");
+        if(i>0)
+            s=substr($0,i+length("fps="));
+
+        if(index($0,"#left")>0)
+            ++left_c;
+    }
+    END{
+        if (length($0)>0) {
+            printf("atw_fps=%s;", s);
+            printf("left_count=%d;",left_c);
+            split($2, tm, ":");
+            tm[3] += 0.001;
+            printf("last_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
+        }
+    }
+    ')
+
+    eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*direct.*fps" | busybox awk '
+    END{
+        i=index($0,"fps=");
+        if(i>0) {
+            s=substr($0,i+length("fps="));
+            printf("app_fps=%s;", s);
+            printf("atw_fps=%d;", 0);
+            printf("left_count=%d;", 0);
+        }
+    }
+    ')
+}
+
+get_sensor_info()
+{
+    sensor_min=0
+    sensor_avg=0
+    sensor_max=0
+    eval $(logcat -v time -t "$sensor_log_date" | grep -E "SensorManager.*Client Time" | busybox awk '
+    END{
+        i=index($0,"] ");
+        if(i>0) {
+            s=substr($0,i+length("] "));
+            #printf("sensor_latency=%s;",s);
+            split(s, sl, ",");
+            #printf("sensor_latency=%d/%d/%d;", sl[1]/1000,sl[2]/1000,sl[3]/1000);
+            printf("sensor_min=%d;", sl[1]/1000);
+            printf("sensor_avg=%d;", sl[2]/1000);
+            printf("sensor_max=%d;", sl[3]/1000);
+            split($2, tm, ":");
+            tm[3] += 0.001;
+            printf("sensor_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
+        }
+    }
+    ')
+}
+
 do_exit()
 {
     echo ""
@@ -87,34 +297,32 @@ do_exit()
     
     app_fps_avg=`echo "$app_fps_total $loop_count" | busybox awk '{printf("%.1f", $1/$2)}'`
 
-if [ $vr_mode == 1 ]; then
-    setprop sys.vr.log 0
-#    setprop sensor.debug.time 0
+    if [ $vr_mode == 1 ]; then
+        setprop sys.vr.log 0
+        #setprop sensor.debug.time 0
 
-    atw_fps_avg=`echo "$atw_fps_total $loop_count" | busybox awk '{printf("%.1f", $1/$2)}'`
-    left_avg=`echo "$left_total $time_used" | busybox awk '{printf("%.1f", $1/$2)}'`
+        atw_fps_avg=`echo "$atw_fps_total $loop_count" | busybox awk '{printf("%.1f", $1/$2)}'`
+        left_avg=`echo "$left_total $time_used" | busybox awk '{printf("%.1f", $1/$2)}'`
     
-    sensor_min_avg=`echo "$sensor_min_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
-    sensor_avg_avg=`echo "$sensor_avg_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
-    sensor_max_avg=`echo "$sensor_max_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
-fi
+        sensor_min_avg=`echo "$sensor_min_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+        sensor_avg_avg=`echo "$sensor_avg_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+        sensor_max_avg=`echo "$sensor_max_total $loop_count" | busybox awk '{printf("%d", $1/$2+0.5)}'`
+    fi
     #echo "------------------------------------------------------------------------"
     let new_cpu_clk=$new_cpu_clk/1000
     let new_gpu_clk=$new_gpu_clk/1000
     let new_ddr_clk=$new_ddr_clk/1000000
 
     echo $title_str
-if [ $vr_mode == 1 ]; then
-    #echo "Average($loop_count):\t$cpu_freq_avg/$cpu_load_avg/$cpu_temp_avg\t$gpu_freq_avg/$gpu_load_avg/$gpu_temp_avg\t$vpu_freq_avg/$hevc_freq_avg\t\t$ddr_freq_avg/$ddr_load_avg\t\t$sensor_min_avg/$sensor_avg_avg/$sensor_max_avg\t$app_fps_avg/$atw_fps_avg/$left_avg"
-    busybox printf "Average(%d):\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%.1f\n" $loop_count $cpu_freq_avg $cpu_load_avg $cpu_temp_avg $gpu_freq_avg $gpu_load_avg $gpu_temp_avg $vpu_freq_avg $hevc_freq_avg $ddr_freq_avg $ddr_load_avg $sensor_min_avg $sensor_avg_avg $sensor_max_avg $app_fps_avg $atw_fps_avg $left_avg
-else
-    busybox printf "Average(%d):\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $loop_count $cpu_freq_avg $cpu_load_avg $cpu_temp_avg $gpu_freq_avg $gpu_load_avg $gpu_temp_avg $vpu_freq_avg $hevc_freq_avg $ddr_freq_avg $ddr_load_avg $app_fps_avg
-fi
+    if [ $vr_mode == 1 ]; then
+        busybox printf "Average(%d):\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%.1f\n" $loop_count $cpu_freq_avg $cpu_load_avg $cpu_temp_avg $gpu_freq_avg $gpu_load_avg $gpu_temp_avg $vpu_freq_avg $hevc_freq_avg $ddr_freq_avg $ddr_load_avg $sensor_min_avg $sensor_avg_avg $sensor_max_avg $app_fps_avg $atw_fps_avg $left_avg
+    else
+        busybox printf "Average(%d):\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $loop_count $cpu_freq_avg $cpu_load_avg $cpu_temp_avg $gpu_freq_avg $gpu_load_avg $gpu_temp_avg $vpu_freq_avg $hevc_freq_avg $ddr_freq_avg $ddr_load_avg $app_fps_avg
+    fi
+
     echo "Fixed freq: CPU=$new_cpu_clk GPU=$new_gpu_clk DDR=$new_ddr_clk"
-    #echo "CPU Load(avg): $cpu_load_avg"
-    #echo "GPU Load(avg): $gpu_load_avg"
-    #echo "DDR Load(avg): $ddr_load_avg"
-    exit 1
+
+    exit 0
 }
 
 shwo_usage()
@@ -204,249 +412,79 @@ setprop debug.sf.fps 1
 setprop debug.hwc.logfps 1
 time_begin=$((`date +%s`+2))
 last_log_date=`date '+%m-%d %H:%M:%S.000'`
-#echo "last_log_date=$last_log_date"
 
 if [ $vr_mode == 1 ]; then
-title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
-#echo $title_str
-setprop sys.vr.log 1
-setprop sensor.debug.time 1
-
-sensor_log_date=$last_log_date
+    title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
+    setprop sys.vr.log 1
+    setprop sensor.debug.time 1
+    sensor_log_date=$last_log_date
 else
-title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
+    title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
 fi
 
-while true
-do
-up_time=`uptime | busybox awk '{print substr($3,0,8)}'`
+while true; do
+    up_time=`uptime | busybox awk '{print substr($3,0,8)}'`
 
-cpu_freq=0
-if [ -f "/sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq" ]; then
-cpu_freq=`cat /sys/bus/cpu/devices/cpu0/cpufreq/cpuinfo_cur_freq`
-cpu_freq=$(($cpu_freq/1000))
-fi
-#echo "CPU Freq: "$cpu_freq" MHz"
+    get_cpu_info
+    prev_cpu_use=$cpu_use
+    prev_cpu_total=$cpu_total
 
-cpu_load=0
-eval $(cat /proc/stat | grep "cpu " | busybox awk '
-{
-    printf("cpu_use=%d; cpu_total=%d;",$2+$3+$4+$6+$7+$8, $2+$3+$4+$5+$6+$7+$8)
-}
-')
-cpu_load=$((($cpu_use-$prev_cpu_use)*100/($cpu_total-$prev_cpu_total)))
-#echo "CPU Load: $cpu_load""%"
-prev_cpu_use=$cpu_use
-prev_cpu_total=$cpu_total
+    if [ $skip_first -gt 0 ]; then
+        skip_first=0
+        sleep 1
+        continue
+    fi
 
-if [ $skip_first -gt 0 ]; then
-    #echo "skip first"
-    skip_first=0
-    sleep 1
-    continue
-fi
+    get_gpu_info
+    get_ddr_info
+    get_vpu_info
+    get_disp_fps
 
-cpu_temp=0
-if [ -f "/sys/devices/ff280000.tsadc/temp1_input" ]; then # rk3288
-cpu_temp=`cat /sys/devices/ff280000.tsadc/temp1_input`
-elif [ -f "/sys/devices/11150000.tsadc/temp0_input" ]; then # rk3228
-cpu_temp=`cat /sys/devices/11150000.tsadc/temp0_input`
-fi
-#echo "CPU Temp: $cpu_temp"
+    if [ $vr_mode == 1 ]; then
+        get_vr_fps
+        get_sensor_info
+    fi
 
-gpu_freq=0
-gpu_load=0
-if [ -f "/sys/devices/ffa30000.gpu/dvfs" ]; then
-eval $(cat /sys/devices/ffa30000.gpu/dvfs | busybox awk '
-{
-    if($1=="current_gpu_clk_freq")
-        printf("gpu_freq=%d;", $3);
-    if($1=="gpu_utilisation")
-        printf("gpu_load=%d;", $3); 
-    if($5=="gpu_utilisation")
-        printf("gpu_load=%d;", $7);
-}
-')
-fi
-#echo "GPU Freq: $gpu_freq MHz"
-#echo "GPU Load: $gpu_load""%"
+    if [ $(($loop_count%20)) -eq 0 ]; then
+        echo $title_str
+    fi
 
-gpu_temp=0
-if [ -f "/sys/devices/ff280000.tsadc/temp2_input" ]; then
-gpu_temp=`cat /sys/devices/ff280000.tsadc/temp2_input`
-fi
-#echo "GPU Temp: $gpu_temp"
-
-ddr_freq=0
-eval $(cat /d/clk/clk_summary | grep ddr | busybox awk '{printf("ddr_freq=%d;", $4/1000000);}')
-#echo "DDR Freq: $ddr_freq MHz"
-
-ddr_load='0'
-if [ -f "/sys/pm_tests/ddrfreq" ]
-then
-    eval $(cat /sys/pm_tests/ddrfreq | grep "curr_load:" | busybox awk '{printf("ddr_load=%d;", $2);}')
-fi
-
-vdpu_freq=0
-eval $(cat /d/clk/clk_summary | grep " clk_vdpu" | busybox awk '
-{
-    if($2<=0)
-        printf("vdpu_freq=%d;", 0);
+    if [ $vr_mode == 1 ]; then
+        busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%d\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $sensor_min $sensor_avg $sensor_max $app_fps $atw_fps $left_count
     else
-        printf("vdpu_freq=%d;", $4/1000000);
-}
-')
-if [ $vdpu_freq == 0 ]; then
-eval $(cat /d/clk/clk_summary | grep " aclk_vpu" | busybox awk '
-{
-    if($2<=0)
-        printf("vdpu_freq=%d;", 0);
-    else
-        printf("vdpu_freq=%d;", $4/1000000);
-}
-')
-fi
+        busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $app_fps
+    fi
 
-hevc_freq=0
-eval $(cat /d/clk/clk_summary | grep " clk_hevc_core" | busybox awk '
-{
-    if($2<=0)
-        printf("hevc_freq=%d;", 0);
-    else
-        printf("hevc_freq=%d;", $4/1000000);
-}
-')
+    cpu_load_total=$(($cpu_load_total+$cpu_load))
+    cpu_freq_total=$(($cpu_freq_total+$cpu_freq))
+    cpu_temp_total=$(($cpu_temp_total+$cpu_temp))
 
-#logcat -v time -t "$last_log_date"
-app_fps=0
-log_date=$last_log_date
+    gpu_load_total=$(($gpu_load_total+$gpu_load))
+    gpu_freq_total=$(($gpu_freq_total+$gpu_freq))
+    gpu_temp_total=$(($gpu_temp_total+$gpu_temp))
 
-#eval $(logcat -v time -t "$last_log_date" | grep -E "SurfaceFlinger.*mFps" | busybox awk -F"=" '{printf("app_fps=%f;", $2);}')
-#logcat -v time -t "$last_log_date" | grep -E "SurfaceFlinger.*mFps" | busybox awk '{print $0;}END{printf("Last: %s\n",$0);}'
-eval $(logcat -v time -t "$log_date" | grep -E "SurfaceFlinger.*mFps" | busybox awk '
-END{
-    i=index($0,"mFps = ");
-    if(i>0) {
-        s=substr($0,i+length("mFps = "));
-        printf("app_fps=%s;",s);
-        split($2, tm, ":");
-        tm[3] += 0.001;
-        printf("last_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
-    }
-}
-')
+    ddr_load_total=$(($ddr_load_total+$ddr_load))
+    ddr_freq_total=$(($ddr_freq_total+$ddr_freq))
 
-if [ $vr_mode == 1 ]; then
-#logcat -v time -t "$last_log_date" | grep -E "VRJni.*app.*FPS" | busybox awk '{print $0;}END{printf("NR=%d\n",$NR);}'
-eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*app.*FPS" | busybox awk '
-END{
-    i=index($0,"FPS=");
-    if(i>0) {
-        s=substr($0,i+length("FPS="));
-        printf("app_fps=%s;",s);
-    }
-}
-')
+    vpu_freq_total=$(($vpu_freq_total+$vdpu_freq))
+    hevc_freq_total=$(($hevc_freq_total+$hevc_freq))
 
-atw_fps=0
-left_count=0
-eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*atw" | grep -v "direct=" | busybox awk '
-BEGIN{left_c=0;s=0}
-{
-    i=index($0,"fps=");
-    if(i>0)
-        s=substr($0,i+length("fps="));
+    app_fps_total=`echo "$app_fps_total $app_fps" | busybox awk '{print($1+$2)}'`
+    if [ $vr_mode == 1 ]; then
+        atw_fps_total=`echo "$atw_fps_total $atw_fps" | busybox awk '{print($1+$2)}'`
+        left_total=$(($left_total+$left_count))
+        sensor_min_total=$(($sensor_min_total+$sensor_min))
+        sensor_avg_total=$(($sensor_avg_total+$sensor_avg))
+        sensor_max_total=$(($sensor_max_total+$sensor_max))
+    fi
 
-    if(index($0,"#left")>0)
-        ++left_c;
-}
-END{
-    if (length($0)>0) {
-        printf("atw_fps=%s;", s);
-        printf("left_count=%d;",left_c);
-        split($2, tm, ":");
-        tm[3] += 0.001;
-        printf("last_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
-    }
-}
-')
+    loop_count=$(($loop_count+1))
 
-eval $(logcat -v time -t "$log_date" | grep -E "VRJni.*direct.*fps" | busybox awk '
-END{
-    i=index($0,"fps=");
-    if(i>0) {
-        s=substr($0,i+length("fps="));
-        printf("app_fps=%s;", s);
-        printf("atw_fps=%d;", 0);
-        printf("left_count=%d;", 0);
-    }
-}
-')
+    if [ $loop_count -eq $max_loop_number ]; then
+       break
+    fi
 
-sensor_min=0
-sensor_avg=0
-sensor_max=0
-eval $(logcat -v time -t "$sensor_log_date" | grep -E "SensorManager.*Client Time" | busybox awk '
-END{
-    i=index($0,"] ");
-    if(i>0) {
-        s=substr($0,i+length("] "));
-        #printf("sensor_latency=%s;",s);
-        split(s, sl, ",");
-        #printf("sensor_latency=%d/%d/%d;", sl[1]/1000,sl[2]/1000,sl[3]/1000);
-        printf("sensor_min=%d;", sl[1]/1000);
-        printf("sensor_avg=%d;", sl[2]/1000);
-        printf("sensor_max=%d;", sl[3]/1000);
-        split($2, tm, ":");
-        tm[3] += 0.001;
-        printf("sensor_log_date=\"%s %02d:%02d:%.03f\";", $1, tm[1], tm[2], tm[3]);
-    }
-}
-')
-#echo "sensor_delay=$sensor_delay, sensor_log_date=$sensor_log_date"
-fi
-
-if [ $(($loop_count%20)) -eq 0 ]; then
-    echo $title_str
-fi
-
-#echo "$up_time\t$cpu_freq/$cpu_load/$cpu_temp\t$gpu_freq/$gpu_load/$gpu_temp\t$vdpu_freq/$hevc_freq\t\t$ddr_freq/$ddr_load\t\t$sensor_min/$sensor_avg/$sensor_max\t$app_fps/$atw_fps/$left_count"
-
-if [ $vr_mode == 1 ]; then
-busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%d\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $sensor_min $sensor_avg $sensor_max $app_fps $atw_fps $left_count
-else
-busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $app_fps
-fi
-
-cpu_load_total=$(($cpu_load_total+$cpu_load))
-cpu_freq_total=$(($cpu_freq_total+$cpu_freq))
-cpu_temp_total=$(($cpu_temp_total+$cpu_temp))
-
-gpu_load_total=$(($gpu_load_total+$gpu_load))
-gpu_freq_total=$(($gpu_freq_total+$gpu_freq))
-gpu_temp_total=$(($gpu_temp_total+$gpu_temp))
-
-ddr_load_total=$(($ddr_load_total+$ddr_load))
-ddr_freq_total=$(($ddr_freq_total+$ddr_freq))
-
-vpu_freq_total=$(($vpu_freq_total+$vdpu_freq))
-hevc_freq_total=$(($hevc_freq_total+$hevc_freq))
-
-app_fps_total=`echo "$app_fps_total $app_fps" | busybox awk '{print($1+$2)}'`
-if [ $vr_mode == 1 ]; then
-atw_fps_total=`echo "$atw_fps_total $atw_fps" | busybox awk '{print($1+$2)}'`
-left_total=$(($left_total+$left_count))
-
-sensor_min_total=$(($sensor_min_total+$sensor_min))
-sensor_avg_total=$(($sensor_avg_total+$sensor_avg))
-sensor_max_total=$(($sensor_max_total+$sensor_max))
-fi
-loop_count=$(($loop_count+1))
-
-if [ $loop_count -eq $max_loop_number ]; then
-    break
-fi
-
-sleep $loop_delay
+    sleep $loop_delay
 done
+
 do_exit
