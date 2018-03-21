@@ -4,6 +4,7 @@
 #
 # Version Information
 #
+#   v1.8 Support RK3326@Linux4.4
 #   v1.7 Compatible RK3399@Linux4.4, and use function rewrite code
 #   v1.6 disable VR mode by default, use "-V" to enable it.
 #   v1.5 output sensor's min/avg/max latency
@@ -16,11 +17,9 @@
 #   v1.1 support rk vr's FPS
 #   v1.0 first version
 #
-#   Authors: cmy@rock-chips.com
-#
 #############################################
 
-version=1.7
+version=1.8
 
 loop_delay=1
 loop_count=0
@@ -93,8 +92,8 @@ get_gpu_info()
     gpu_load=0
     gpu_temp=0
 
-    if [ -f "/sys/devices/ffa30000.gpu/dvfs" ]; then
-        eval $(cat /sys/devices/ffa30000.gpu/dvfs | busybox awk '
+    if [ -f "/sys/devices/$gpu_name/dvfs" ]; then
+        eval $(cat /sys/devices/$gpu_name/dvfs | busybox awk '
         {
         if($1=="current_gpu_clk_freq")
             printf("gpu_freq=%d;", $3);
@@ -104,8 +103,8 @@ get_gpu_info()
             printf("gpu_load=%d;", $7);
         }
         ')
-    elif [ -f "/sys/devices/platform/ff9a0000.gpu/devfreq/ff9a0000.gpu/load" ]; then
-        eval $(cat /sys/devices/platform/*.gpu/devfreq/*.gpu/load | busybox awk -F@ '
+    elif [ -f "/sys/devices/platform/$gpu_name/devfreq/$gpu_name/load" ]; then
+        eval $(cat /sys/devices/platform/$gpu_name/devfreq/$gpu_name/load | busybox awk -F@ '
         {
             printf("gpu_load=%d;", $1);
             printf("gpu_freq=%d;", ($2+0)/1000000);
@@ -146,7 +145,7 @@ get_vpu_info()
     }
     ')
     if [ $vdpu_freq == 0 ]; then
-    eval $(cat /d/clk/clk_summary | grep " aclk_vpu" | busybox awk '
+    eval $(cat /d/clk/clk_summary | grep " aclk_vpu " | busybox awk '
     {
         if($2<=0)
             printf("vdpu_freq=%d;", 0);
@@ -339,7 +338,7 @@ echo "  -n num\t\tLoop count"
 trap 'do_exit' 1 2 3 6 15
 
 echo ""
-echo "Hardware Monitor for RK3288 VR, Version: "$version
+echo "Hardware Monitor for Rockchip platform, Version: "$version
 echo "\tF - Freq(MHz)"
 echo "\tL - Load(%)"
 echo "\tT - Temperature(C)"
@@ -347,8 +346,9 @@ echo ""
 echo "[Model]: "`getprop ro.product.model`
 echo "[Firmware]: "`getprop ro.build.description`
 echo "[Kernel]: "`cat /proc/version`
-echo ""
 
+gpu_name=''
+eval $(cat /proc/iomem | grep gpu | busybox awk '{printf("gpu_name=%s;", $3);}')
 
 while getopts "n:C:D:G:V" arg
 do
@@ -376,7 +376,7 @@ do
             echo "set clk_ddr $new_ddr_clk" > /sys/pm_tests/clk_rate
             ;;
         G)
-            if [ ! -f "/sys/devices/ffa30000.gpu/dvfs" ]
+            if [ ! -f "/sys/devices/$gpu_name/dvfs" ]
             then
                 echo "Unsupport setup GPU clock!"
                 echo ""
@@ -386,10 +386,10 @@ do
             let new_gpu_clk=$OPTARG*1000
             if [ "$new_gpu_clk" -eq "0" ]
             then
-                echo "on" > /sys/devices/ffa30000.gpu/dvfs
+                echo "on" > /sys/devices/$gpu_name/dvfs
             else
-                echo "off" > /sys/devices/ffa30000.gpu/dvfs
-                echo $new_gpu_clk> /sys/devices/ffa30000.gpu/clock
+                echo "off" > /sys/devices/$gpu_name/dvfs
+                echo $new_gpu_clk> /sys/devices/$gpu_name/clock
             fi
             ;;
         n)
@@ -414,16 +414,16 @@ time_begin=$((`date +%s`+2))
 last_log_date=`date '+%m-%d %H:%M:%S.000'`
 
 if [ $vr_mode == 1 ]; then
-    title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
+    title_str="\nUPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
     setprop sys.vr.log 1
     setprop sensor.debug.time 1
     sensor_log_date=$last_log_date
 else
-    title_str="UPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
+    title_str="\nUPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
 fi
 
 while true; do
-    up_time=`uptime | busybox awk '{print substr($3,0,8)}'`
+    up_time=`uptime | busybox awk '{print $1}'`
 
     get_cpu_info
     prev_cpu_use=$cpu_use
