@@ -414,16 +414,16 @@ time_begin=$((`date +%s`+2))
 last_log_date=`date '+%m-%d %H:%M:%S.000'`
 
 if [ $vr_mode == 1 ]; then
-    title_str="\nUPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
+    title_str="\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tSENSOR(us)\tFPS(app/atw/left)"
     setprop sys.vr.log 1
     setprop sensor.debug.time 1
     sensor_log_date=$last_log_date
 else
-    title_str="\nUPTIME(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
+    title_str="\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)\tFPS"
 fi
 
 while true; do
-    up_time=`uptime | busybox awk '{print $1}'`
+    up_time=`busybox cut -f1 -d. /proc/uptime`
 
     get_cpu_info
     prev_cpu_use=$cpu_use
@@ -450,9 +450,9 @@ while true; do
     fi
 
     if [ $vr_mode == 1 ]; then
-        busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%d\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $sensor_min $sensor_avg $sensor_max $app_fps $atw_fps $left_count
+        busybox printf "%06d\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%03d/%03d/%03d\t%.1f/%.1f/%d\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $sensor_min $sensor_avg $sensor_max $app_fps $atw_fps $left_count
     else
-        busybox printf "%s\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $app_fps
+        busybox printf "%06d\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t\t%.1f\n" $up_time $cpu_freq $cpu_load $cpu_temp $gpu_freq $gpu_load $gpu_temp $vdpu_freq $hevc_freq $ddr_freq $ddr_load $app_fps
     fi
 
     cpu_load_total=$(($cpu_load_total+$cpu_load))
