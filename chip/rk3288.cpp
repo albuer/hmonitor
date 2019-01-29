@@ -82,11 +82,6 @@ int RK3288Chip::get_ddr_rate()
 	return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_ddr":"sclk_ddrc");
 }
 
-int RK3288Chip::get_ddr_load()
-{
-	return 0;
-}
-
 int RK3288Chip::get_vcodec_rate()
 {
     int rate, enable_cnt;

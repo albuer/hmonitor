@@ -15,7 +15,6 @@ public:
     virtual int get_gpu_temp();
 
     virtual int get_ddr_rate();
-    virtual int get_ddr_load();
 
     virtual int get_vcodec_rate();
     virtual int get_hevc_rate();

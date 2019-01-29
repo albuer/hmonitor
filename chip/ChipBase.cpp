@@ -264,3 +264,13 @@ int ChipBase::set_cpu_rate(int core_idx, int rate_MHz)
     return 0;
 }
 
+int ChipBase::get_ddr_load()
+{
+    int load = 0;
+    if (linux_ver<=LINUX_3_10)
+        load = 0;
+    else
+        load = read_file_value("/sys/devices/platform/dmc/devfreq/dmc/load");
+    return load;
+}
+

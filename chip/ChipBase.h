@@ -73,7 +73,7 @@ public:
     virtual int get_gpu_temp() = 0;
 
     virtual int get_ddr_rate() = 0;
-    virtual int get_ddr_load() = 0;
+    int get_ddr_load();
 
     virtual int get_vcodec_rate() = 0;
     virtual int get_hevc_rate() = 0;

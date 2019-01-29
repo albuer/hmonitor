@@ -53,11 +53,6 @@ int RK3399Chip::get_ddr_rate()
 	return get_rate_from_summary("sclk_ddrc");
 }
 
-int RK3399Chip::get_ddr_load()
-{
-	return 0;
-}
-
 int RK3399Chip::get_vcodec_rate()
 {
     int rate, enable_cnt;

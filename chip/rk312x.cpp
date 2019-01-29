@@ -52,11 +52,6 @@ int RK312xChip::get_ddr_rate()
 	return get_rate_from_summary("clk_ddr");
 }
 
-int RK312xChip::get_ddr_load()
-{
-	return 0;
-}
-
 int RK312xChip::get_vcodec_rate()
 {
     int rate, enable_cnt;
