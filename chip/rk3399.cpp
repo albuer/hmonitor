@@ -65,6 +65,11 @@ int RK3399Chip::get_vcodec_rate()
 
 int RK3399Chip::get_hevc_rate()
 {
-	return 0;
+    int rate, enable_cnt;
+    rate = get_rate_from_summary("aclk_vdu", &enable_cnt);
+    if (enable_cnt <= 0)
+        rate = 0;
+
+	return rate;
 }
 
