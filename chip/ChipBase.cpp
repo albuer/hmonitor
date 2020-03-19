@@ -1,30 +1,17 @@
 #include <sys/system_properties.h>
 #include "ChipBase.h"
 
-struct clk_info* ChipBase::clk_summary = new struct clk_info[1000]; 
+struct clk_info* ChipBase::clk_summary = new struct clk_info[1000];
 int ChipBase::clk_summary_idx = 0;
 char ChipBase::chip_model_str[256] = "";
 
 ChipBase::ChipBase()
 {
+    char value[256] = "";
+    __system_property_get("ro.build.version.sdk", value);
+    android_api_level = atoi(value);
     __system_property_get("ro.build.version.release", android_ver_str);
 //    printf("ro.build.version.release: %s\n", value);
-
-    if (strncmp(android_ver_str, "4.4", 3) == 0) {
-        android_ver = ANDROID_4_4;
-    } else if (strncmp(android_ver_str, "5", 1) == 0) {
-        android_ver = ANDROID_5;
-    } else if (strncmp(android_ver_str, "6", 1) == 0) {
-        android_ver = ANDROID_6;
-    } else if (strncmp(android_ver_str, "7", 1) == 0) {
-        android_ver = ANDROID_7;
-    } else if (strncmp(android_ver_str, "8", 1) == 0) {
-        android_ver = ANDROID_8;
-    } else if (strncmp(android_ver_str, "9", 1) == 0) {
-        android_ver = ANDROID_9;
-    } else {
-        android_ver = ANDROID_UNKNOWN;
-    }
 
     // get kernel version
     FILE* fp = fopen("/proc/version", "r");
@@ -42,7 +29,7 @@ ChipBase::ChipBase()
         fclose(fp);
     }
 
-    if (android_ver > ANDROID_4_4)
+    if (android_api_level > 20)
         __system_property_set("debug.sf.fps", "1");
     else
         __system_property_set("debug.hwc.logfps", "1");
@@ -50,7 +37,7 @@ ChipBase::ChipBase()
 
 ChipBase::~ChipBase()
 {
-    if (android_ver > ANDROID_4_4)
+    if (android_api_level > 20)
         __system_property_set("debug.sf.fps", "0");
     else
         __system_property_set("debug.hwc.logfps", "0");
@@ -139,7 +126,7 @@ int ChipBase::read_file_value(const char* file)
         fclose(fp);
     }
 
-	return value;
+    return value;
 }
 
 int ChipBase::get_cpu_load(int* lit_cpu_load, int* big_cpu_load)
@@ -199,7 +186,7 @@ int ChipBase::get_fps()
     static char last_log_date[64] = "1";
     char cmd[128];
 
-    if (android_ver > ANDROID_4_4)
+    if (android_api_level > 20)
         sprintf(cmd, "logcat -b main -v time -s SurfaceFlinger -t '%s'", last_log_date);
     else
         sprintf(cmd, "logcat -b main -v time -d -s hwcomposer -d");
@@ -218,14 +205,14 @@ int ChipBase::get_fps()
     {
         char* p = strstr(buff, "mFps");
         if(p) {
-//            printf("=> %s",buff);
+            //printf("=> %s",buff);
             //fps = atof(p+6);
-	    fps = atoi(p+6);
+            fps = atoi(p+6);
         }
     }
     pclose(fp);
 
-    if (android_ver > ANDROID_4_4) {
+    if (android_api_level > 20) {
         time_t timep;
         struct tm *p;
         time(&timep);
@@ -237,7 +224,7 @@ int ChipBase::get_fps()
         system("logcat -c");
     }
 
-	return fps;
+    return fps;
 }
 
 int ChipBase::set_cpu_rate(int core_idx, int rate_MHz)
@@ -274,4 +261,3 @@ int ChipBase::get_ddr_load()
         load = read_file_value("/sys/devices/platform/dmc/devfreq/dmc/load");
     return load;
 }
-

@@ -61,7 +61,7 @@ int main()
 
     printf("Android version: %s\n", chip->android_ver_str);
     printf("Kernel: %s\n", chip->linux_ver_str);
-    
+
     printf("\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)    FPS\n");
     printf("------------------------------------------------------------------------\n");
 

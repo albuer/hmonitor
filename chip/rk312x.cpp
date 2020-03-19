@@ -19,18 +19,18 @@ int RK312xChip::get_cpu_rate_l()
 
 int RK312xChip::get_cpu_rate_b()
 {
-	return 0;
+    return 0;
 }
 
 int RK312xChip::get_cpu_temp()
 {
     // unsupport
-	return 0;
+    return 0;
 }
 
 int RK312xChip::get_gpu_rate()
 {
-	return get_rate_from_summary("clk_gpu");
+    return get_rate_from_summary("clk_gpu");
 }
 
 int RK312xChip::get_gpu_load()
@@ -44,12 +44,12 @@ int RK312xChip::get_gpu_load()
 int RK312xChip::get_gpu_temp()
 {
     // unsupport
-	return 0;
+    return 0;
 }
 
 int RK312xChip::get_ddr_rate()
 {
-	return get_rate_from_summary("clk_ddr");
+    return get_rate_from_summary("clk_ddr");
 }
 
 int RK312xChip::get_vcodec_rate()
@@ -59,7 +59,7 @@ int RK312xChip::get_vcodec_rate()
     if (enable_cnt <= 0)
         rate = 0;
 
-	return rate;
+    return rate;
 }
 
 int RK312xChip::get_hevc_rate()
@@ -69,7 +69,7 @@ int RK312xChip::get_hevc_rate()
     if (enable_cnt <= 0)
         rate = 0;
 
-	return rate;
+    return rate;
 }
 
 
