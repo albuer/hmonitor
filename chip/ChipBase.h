@@ -25,7 +25,7 @@ struct clk_info {
     char clk_name[64];
     int enable_cnt;
     int prepare_cnt;
-    unsigned int rate;
+    unsigned int freq;
 };
 
 class ChipBase {
@@ -50,29 +50,29 @@ public:
     int update_clk_summary();
     int get_cpu_load(int* lit_cpu_load, int* big_cpu_load);
     int get_fps();
-    void set_cpu_rate_l(int rate_MHz) {set_cpu_rate(lit_cpu_idx, rate_MHz);};
-    void set_cpu_rate_b(int rate_MHz) {set_cpu_rate(big_cpu_idx, rate_MHz);};
+    void set_cpu_freq_l(int freq_MHz) {set_cpu_freq(lit_cpu_idx, freq_MHz);};
+    void set_cpu_freq_b(int freq_MHz) {set_cpu_freq(big_cpu_idx, freq_MHz);};
 
-    virtual int get_cpu_rate_l() = 0;
-    virtual int get_cpu_rate_b() = 0;
+    virtual int get_cpu_freq_l() = 0;
+    virtual int get_cpu_freq_b() = 0;
     virtual int get_cpu_temp() = 0;
 
-    virtual int get_gpu_rate() = 0;
+    virtual int get_gpu_freq() = 0;
     virtual int get_gpu_load() = 0;
     virtual int get_gpu_temp() = 0;
 
-    virtual int get_ddr_rate() = 0;
+    virtual int get_ddr_freq() = 0;
     int get_ddr_load();
 
-    virtual int get_vpu_rate();
+    virtual int get_vpu_freq();
 
 protected:
-    int get_rate_from_summary(const char* name, int *enable_cnt);
-    inline int get_rate_from_summary(const char* name){
-        return get_rate_from_summary(name, (int*)0);
+    int get_freq_from_summary(const char* name, int *enable_cnt);
+    inline int get_freq_from_summary(const char* name){
+        return get_freq_from_summary(name, (int*)0);
     };
     int read_file_value(const char* file);
-    int set_cpu_rate(int core_idx, int rate_MHz);
+    int set_cpu_freq(int core_idx, int freq_MHz);
 
 private:
 };

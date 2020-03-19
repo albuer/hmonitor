@@ -72,24 +72,24 @@ int main()
         int uptime = get_uptime();
 
         chip->update_clk_summary();
-        int lit_cpu_load, lit_cpu_rate;
-        int big_cpu_load, big_cpu_rate;
+        int lit_cpu_load, lit_cpu_freq;
+        int big_cpu_load, big_cpu_freq;
         chip->get_cpu_load(&lit_cpu_load, &big_cpu_load);
-        lit_cpu_rate = chip->get_cpu_rate_l();
-        big_cpu_rate = chip->get_cpu_rate_b();
+        lit_cpu_freq = chip->get_cpu_freq_l();
+        big_cpu_freq = chip->get_cpu_freq_b();
 
-        int cpu_rate, cpu_load;
-        cpu_rate = (big_cpu_rate*chip->big_cpu_count + lit_cpu_rate*chip->lit_cpu_count)/(chip->big_cpu_count+chip->lit_cpu_count);
+        int cpu_freq, cpu_load;
+        cpu_freq = (big_cpu_freq*chip->big_cpu_count + lit_cpu_freq*chip->lit_cpu_count)/(chip->big_cpu_count+chip->lit_cpu_count);
         cpu_load = (big_cpu_load*chip->big_cpu_count + lit_cpu_load*chip->lit_cpu_count)/(chip->big_cpu_count+chip->lit_cpu_count);
         printf("%.6d\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d\t%03d/%02d\t    %d\n", uptime,
-                cpu_rate, cpu_load, chip->get_cpu_temp(),
-                chip->get_gpu_rate(), chip->get_gpu_load(), chip->get_gpu_temp(),
-                chip->get_vpu_rate(),
-                chip->get_ddr_rate(), chip->get_ddr_load(), chip->get_fps());
+                cpu_freq, cpu_load, chip->get_cpu_temp(),
+                chip->get_gpu_freq(), chip->get_gpu_load(), chip->get_gpu_temp(),
+                chip->get_vpu_freq(),
+                chip->get_ddr_freq(), chip->get_ddr_load(), chip->get_fps());
 
         if (chip->big_cpu_count > 0) {
-            printf("  L(%d)\t%03d/%02d\n", chip->lit_cpu_count, lit_cpu_rate, lit_cpu_load);
-            printf("  B(%d)\t%03d/%02d\n", chip->big_cpu_count, big_cpu_rate, big_cpu_load);
+            printf("  L(%d)\t%03d/%02d\n", chip->lit_cpu_count, lit_cpu_freq, lit_cpu_load);
+            printf("  B(%d)\t%03d/%02d\n", chip->big_cpu_count, big_cpu_freq, big_cpu_load);
         }
 
         // delay 2s

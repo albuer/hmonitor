@@ -74,44 +74,44 @@ int ChipBase::update_clk_summary()
     char clk_name[64];
     int enable_cnt;
     int prepare_cnt;
-    unsigned int rate;
+    unsigned int freq;
     int accuracy;
     int phase;
 
     clk_summary_idx = 0;
     while(fgets(line, sizeof(line), fp) && clk_summary_idx<1000) {
-        if(sscanf(line, "%s %d %d %d %d %d", clk_name, &enable_cnt, &prepare_cnt, &rate, &accuracy, &phase)<4)
+        if(sscanf(line, "%s %d %d %d %d %d", clk_name, &enable_cnt, &prepare_cnt, &freq, &accuracy, &phase)<4)
             continue;
 
         struct clk_info* p = &clk_summary[clk_summary_idx++];
         strcpy(p->clk_name, clk_name);
         p->enable_cnt = enable_cnt;
         p->prepare_cnt = prepare_cnt;
-        p->rate = rate;
+        p->freq = freq;
     }
 /*
     int i=0;
     for(i=0; i<clk_summary_idx; i++) {
-        printf("%d: %s, %d, %d, %d\n", i, clk_summary[i].clk_name, clk_summary[i].enable_cnt, clk_summary[i].prepare_cnt, clk_summary[i].rate);
+        printf("%d: %s, %d, %d, %d\n", i, clk_summary[i].clk_name, clk_summary[i].enable_cnt, clk_summary[i].prepare_cnt, clk_summary[i].freq);
     }
 */
     return 0;
 }
 
-int ChipBase::get_rate_from_summary(const char* name, int *enable_cnt)
+int ChipBase::get_freq_from_summary(const char* name, int *enable_cnt)
 {
-    int rate_MHz = 0;
+    int freq_MHz = 0;
     int i=0;
     for(i=0; i<clk_summary_idx; i++) {
         if (strcmp(clk_summary[i].clk_name, name)==0) {
-            rate_MHz = clk_summary[i].rate / 1000000;
+            freq_MHz = clk_summary[i].freq / 1000000;
             if(enable_cnt)
                 *enable_cnt = clk_summary[i].enable_cnt;
             break;
         }
     }
 
-    return rate_MHz;
+    return freq_MHz;
 }
 
 int ChipBase::read_file_value(const char* file)
@@ -225,7 +225,7 @@ int ChipBase::get_fps()
     return fps;
 }
 
-int ChipBase::set_cpu_rate(int core_idx, int rate_MHz)
+int ChipBase::set_cpu_freq(int core_idx, int freq_MHz)
 {
     char governor_str[128];
     char setspeed_str[128];
@@ -240,9 +240,9 @@ int ChipBase::set_cpu_rate(int core_idx, int rate_MHz)
 
         fp = fopen(governor_str, "r+");
         if (fp != NULL) {
-            char rate_str[256];
-            sprintf(rate_str, "%d", rate_MHz*1000);
-            fwrite(rate_str, 1, strlen(rate_str), fp);
+            char freq_str[256];
+            sprintf(freq_str, "%d", freq_MHz*1000);
+            fwrite(freq_str, 1, strlen(freq_str), fp);
             fclose(fp);
         }
     }
@@ -260,15 +260,15 @@ int ChipBase::get_ddr_load()
     return load;
 }
 
-int ChipBase::get_vpu_rate()
+int ChipBase::get_vpu_freq()
 {
-    int rate, enable_cnt;
-    rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_vdpu":"aclk_vdpu", &enable_cnt);
+    int freq, enable_cnt;
+    freq = get_freq_from_summary(linux_ver==LINUX_3_10?"clk_vdpu":"aclk_vdpu", &enable_cnt);
     if (enable_cnt <= 0) {
-        rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
+        freq = get_freq_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
         if (enable_cnt <= 0)
-            rate = 0;
+            freq = 0;
     }
 
-    return rate;
+    return freq;
 }

@@ -12,14 +12,14 @@ RK3368Chip::RK3368Chip():ChipBase()
     big_cpu_count = 4;
 }
 
-int RK3368Chip::get_cpu_rate_l()
+int RK3368Chip::get_cpu_freq_l()
 {
-    return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_core_l":"armclkl");
+    return get_freq_from_summary(linux_ver==LINUX_3_10?"clk_core_l":"armclkl");
 }
 
-int RK3368Chip::get_cpu_rate_b()
+int RK3368Chip::get_cpu_freq_b()
 {
-    return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_core_b":"armclkb");
+    return get_freq_from_summary(linux_ver==LINUX_3_10?"clk_core_b":"armclkb");
 }
 
 int RK3368Chip::get_cpu_temp()
@@ -34,9 +34,9 @@ int RK3368Chip::get_cpu_temp()
     return temp;
 }
 
-int RK3368Chip::get_gpu_rate()
+int RK3368Chip::get_gpu_freq()
 {
-    return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_gpu":"sclk_gpu_core");
+    return get_freq_from_summary(linux_ver==LINUX_3_10?"clk_gpu":"sclk_gpu_core");
 }
 
 int RK3368Chip::get_gpu_load()
@@ -61,20 +61,20 @@ int RK3368Chip::get_gpu_temp()
     return temp;
 }
 
-int RK3368Chip::get_ddr_rate()
+int RK3368Chip::get_ddr_freq()
 {
-    return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_ddr":"sclk_ddrc");
+    return get_freq_from_summary(linux_ver==LINUX_3_10?"clk_ddr":"sclk_ddrc");
 }
 
-int RK3368Chip::get_vpu_rate()
+int RK3368Chip::get_vpu_freq()
 {
-    int rate, enable_cnt;
-    rate = get_rate_from_summary("aclk_vdpu", &enable_cnt);
+    int freq, enable_cnt;
+    freq = get_freq_from_summary("aclk_vdpu", &enable_cnt);
     if (enable_cnt <= 0) {
-        rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
+        freq = get_freq_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
         if (enable_cnt <= 0)
-            rate = 0;
+            freq = 0;
     }
 
-    return rate;
+    return freq;
 }

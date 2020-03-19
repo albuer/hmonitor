@@ -12,12 +12,12 @@ RK312xChip::RK312xChip():ChipBase()
     big_cpu_count = 0;
 }
 
-int RK312xChip::get_cpu_rate_l()
+int RK312xChip::get_cpu_freq_l()
 {
-    return get_rate_from_summary("clk_core");
+    return get_freq_from_summary("clk_core");
 }
 
-int RK312xChip::get_cpu_rate_b()
+int RK312xChip::get_cpu_freq_b()
 {
     return 0;
 }
@@ -28,9 +28,9 @@ int RK312xChip::get_cpu_temp()
     return 0;
 }
 
-int RK312xChip::get_gpu_rate()
+int RK312xChip::get_gpu_freq()
 {
-    return get_rate_from_summary("clk_gpu");
+    return get_freq_from_summary("clk_gpu");
 }
 
 int RK312xChip::get_gpu_load()
@@ -47,20 +47,20 @@ int RK312xChip::get_gpu_temp()
     return 0;
 }
 
-int RK312xChip::get_ddr_rate()
+int RK312xChip::get_ddr_freq()
 {
-    return get_rate_from_summary("clk_ddr");
+    return get_freq_from_summary("clk_ddr");
 }
 
-int RK312xChip::get_vpu_rate()
+int RK312xChip::get_vpu_freq()
 {
-    int rate, enable_cnt;
-    rate = get_rate_from_summary("clk_vdpu", &enable_cnt);
+    int freq, enable_cnt;
+    freq = get_freq_from_summary("clk_vdpu", &enable_cnt);
     if (enable_cnt <= 0) {
-        rate = get_rate_from_summary("clk_hevc_core", &enable_cnt);
+        freq = get_freq_from_summary("clk_hevc_core", &enable_cnt);
         if (enable_cnt <= 0)
-            rate = 0;
+            freq = 0;
     }
 
-    return rate;
+    return freq;
 }
