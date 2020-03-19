@@ -5,8 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <cutils/properties.h>
-#include<time.h>
+#include <time.h>
 
 enum CHIP_MODEL {
     CHIP_3399 = 0,

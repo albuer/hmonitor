@@ -1,3 +1,4 @@
+#include <sys/system_properties.h>
 #include "ChipBase.h"
 
 struct clk_info* ChipBase::clk_summary = new struct clk_info[1000]; 
@@ -6,7 +7,7 @@ char ChipBase::chip_model_str[256] = "";
 
 ChipBase::ChipBase()
 {
-    property_get("ro.build.version.release", android_ver_str, "");
+    __system_property_get("ro.build.version.release", android_ver_str);
 //    printf("ro.build.version.release: %s\n", value);
 
     if (strncmp(android_ver_str, "4.4", 3) == 0) {
@@ -42,24 +43,24 @@ ChipBase::ChipBase()
     }
 
     if (android_ver > ANDROID_4_4)
-        property_set("debug.sf.fps", "1");
+        __system_property_set("debug.sf.fps", "1");
     else
-        property_set("debug.hwc.logfps", "1");
+        __system_property_set("debug.hwc.logfps", "1");
 }
 
 ChipBase::~ChipBase()
 {
     if (android_ver > ANDROID_4_4)
-        property_set("debug.sf.fps", "0");
+        __system_property_set("debug.sf.fps", "0");
     else
-        property_set("debug.hwc.logfps", "0");
+        __system_property_set("debug.hwc.logfps", "0");
 }
 
 int ChipBase::get_model()
 {
     int cpu_model = CHIP_UNSUPPORT;
     // get chip model
-    if (property_get("ro.board.platform", chip_model_str, "") && strlen(chip_model_str)>0) {
+    if (__system_property_get("ro.board.platform", chip_model_str) && strlen(chip_model_str)>0) {
 //        printf("ro.board.platform %s\n", value);
         if (strcasestr(chip_model_str, "3399"))
             cpu_model = CHIP_3399;
