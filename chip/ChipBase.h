@@ -64,8 +64,7 @@ public:
     virtual int get_ddr_rate() = 0;
     int get_ddr_load();
 
-    virtual int get_vcodec_rate() = 0;
-    virtual int get_hevc_rate() = 0;
+    virtual int get_vpu_rate();
 
 protected:
     int get_rate_from_summary(const char* name, int *enable_cnt);

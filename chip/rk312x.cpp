@@ -52,24 +52,15 @@ int RK312xChip::get_ddr_rate()
     return get_rate_from_summary("clk_ddr");
 }
 
-int RK312xChip::get_vcodec_rate()
+int RK312xChip::get_vpu_rate()
 {
     int rate, enable_cnt;
     rate = get_rate_from_summary("clk_vdpu", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
+    if (enable_cnt <= 0) {
+        rate = get_rate_from_summary("clk_hevc_core", &enable_cnt);
+        if (enable_cnt <= 0)
+            rate = 0;
+    }
 
     return rate;
 }
-
-int RK312xChip::get_hevc_rate()
-{
-    int rate, enable_cnt;
-    rate = get_rate_from_summary("clk_hevc_core", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
-
-    return rate;
-}
-
-

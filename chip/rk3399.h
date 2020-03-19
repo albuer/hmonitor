@@ -18,8 +18,7 @@ public:
 
     virtual int get_ddr_rate();
 
-    virtual int get_vcodec_rate();
-    virtual int get_hevc_rate();
+    virtual int get_vpu_rate();
 };
 
 //}  // namespace android

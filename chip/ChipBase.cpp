@@ -205,8 +205,6 @@ int ChipBase::get_fps()
     {
         char* p = strstr(buff, "mFps");
         if(p) {
-            //printf("=> %s",buff);
-            //fps = atof(p+6);
             fps = atoi(p+6);
         }
     }
@@ -260,4 +258,17 @@ int ChipBase::get_ddr_load()
     else
         load = read_file_value("/sys/devices/platform/dmc/devfreq/dmc/load");
     return load;
+}
+
+int ChipBase::get_vpu_rate()
+{
+    int rate, enable_cnt;
+    rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_vdpu":"aclk_vdpu", &enable_cnt);
+    if (enable_cnt <= 0) {
+        rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
+        if (enable_cnt <= 0)
+            rate = 0;
+    }
+
+    return rate;
 }

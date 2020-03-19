@@ -81,25 +81,3 @@ int RK3288Chip::get_ddr_rate()
 {
     return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_ddr":"sclk_ddrc");
 }
-
-int RK3288Chip::get_vcodec_rate()
-{
-    int rate, enable_cnt;
-    rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_vdpu":"aclk_vdpu", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
-
-    return rate;
-}
-
-int RK3288Chip::get_hevc_rate()
-{
-    int rate, enable_cnt;
-    rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
-
-    return rate;
-}
-
-

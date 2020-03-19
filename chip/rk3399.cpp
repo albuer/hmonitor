@@ -53,23 +53,15 @@ int RK3399Chip::get_ddr_rate()
     return get_rate_from_summary("sclk_ddrc");
 }
 
-int RK3399Chip::get_vcodec_rate()
+int RK3399Chip::get_vpu_rate()
 {
     int rate, enable_cnt;
     rate = get_rate_from_summary("aclk_vcodec", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
+    if (enable_cnt <= 0) {
+        rate = get_rate_from_summary("aclk_vdu", &enable_cnt);
+        if (enable_cnt <= 0)
+            rate = 0;
+    }
 
     return rate;
 }
-
-int RK3399Chip::get_hevc_rate()
-{
-    int rate, enable_cnt;
-    rate = get_rate_from_summary("aclk_vdu", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
-
-    return rate;
-}
-

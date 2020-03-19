@@ -62,7 +62,7 @@ int main()
     printf("Android version: %s\n", chip->android_ver_str);
     printf("Kernel: %s\n", chip->linux_ver_str);
 
-    printf("\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)    FPS\n");
+    printf("\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU(F)\tDDR(F/L)    FPS\n");
     printf("------------------------------------------------------------------------\n");
 
     int loop_count = 0;
@@ -81,10 +81,10 @@ int main()
         int cpu_rate, cpu_load;
         cpu_rate = (big_cpu_rate*chip->big_cpu_count + lit_cpu_rate*chip->lit_cpu_count)/(chip->big_cpu_count+chip->lit_cpu_count);
         cpu_load = (big_cpu_load*chip->big_cpu_count + lit_cpu_load*chip->lit_cpu_count)/(chip->big_cpu_count+chip->lit_cpu_count);
-        printf("%.6d\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d/%03d\t\t%03d/%02d\t    %d\n", uptime,
+        printf("%.6d\t%03d/%02d/%02d\t%03d/%02d/%02d\t%03d\t%03d/%02d\t    %d\n", uptime,
                 cpu_rate, cpu_load, chip->get_cpu_temp(),
                 chip->get_gpu_rate(), chip->get_gpu_load(), chip->get_gpu_temp(),
-                chip->get_vcodec_rate(), chip->get_hevc_rate(),
+                chip->get_vpu_rate(),
                 chip->get_ddr_rate(), chip->get_ddr_load(), chip->get_fps());
 
         if (chip->big_cpu_count > 0) {
@@ -96,7 +96,7 @@ int main()
         usleep(2000000);
         if(++loop_count>=16) {
             loop_count = 0;
-            printf("\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU/HEVC(F)\tDDR(F/L)    FPS\n");
+            printf("\nUP(s)\tCPU(F/L/T)\tGPU(F/L/T)\tVPU(F)\tDDR(F/L)    FPS\n");
             printf("------------------------------------------------------------------------\n");
         }
     }

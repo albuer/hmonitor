@@ -42,7 +42,7 @@ int RK3368Chip::get_gpu_rate()
 int RK3368Chip::get_gpu_load()
 {
     int load = 0;
-    
+
     if (linux_ver==LINUX_3_10)
         load = 0;
     else // 21@200000000Hz
@@ -66,23 +66,15 @@ int RK3368Chip::get_ddr_rate()
     return get_rate_from_summary(linux_ver==LINUX_3_10?"clk_ddr":"sclk_ddrc");
 }
 
-int RK3368Chip::get_vcodec_rate()
+int RK3368Chip::get_vpu_rate()
 {
     int rate, enable_cnt;
     rate = get_rate_from_summary("aclk_vdpu", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
+    if (enable_cnt <= 0) {
+        rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
+        if (enable_cnt <= 0)
+            rate = 0;
+    }
 
     return rate;
 }
-
-int RK3368Chip::get_hevc_rate()
-{
-    int rate, enable_cnt;
-    rate = get_rate_from_summary(linux_ver==LINUX_3_10?"clk_hevc_core":"sclk_hevc_core", &enable_cnt);
-    if (enable_cnt <= 0)
-        rate = 0;
-
-    return rate;
-}
-
