@@ -12,6 +12,7 @@ void KernelBase::InitNode_4_19()
     gpu_freq_list.push_back(Node("/sys/class/devfreq/ffa30000.gpu/cur_freq", NULL, 1000)); // rk3288
     gpu_freq_list.push_back(Node("/sys/class/devfreq/ff400000.gpu/cur_freq", NULL, 1000)); // rk3326
     gpu_freq_list.push_back(Node("/sys/class/devfreq/ffa30000.rogue-g6110/cur_freq", NULL, 1000)); // rk3368
+    gpu_freq_list.push_back(Node("/sys/class/devfreq/fb000000.gpu/cur_freq", NULL, 1000)); // rk3588
 
     // GPU LOAD
     gpu_load_list.push_back(Node("/sys/class/devfreq/fde60000.gpu/load")); // rk356x
@@ -19,6 +20,7 @@ void KernelBase::InitNode_4_19()
     gpu_load_list.push_back(Node("/sys/class/devfreq/ffa30000.gpu/load")); // rk3288
     gpu_load_list.push_back(Node("/sys/class/devfreq/ff400000.gpu/load")); // rk3326
     gpu_load_list.push_back(Node("/sys/class/devfreq/ffa30000.rogue-g6110/load")); // rk3368
+    gpu_load_list.push_back(Node("/sys/class/devfreq/fb000000.gpu/load")); // rk3588
 
     // GPU TEMP
     gpu_temp_list.push_back(Node("/sys/class/thermal/thermal_zone1/temp"));
