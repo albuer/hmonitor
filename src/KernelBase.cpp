@@ -7,6 +7,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <dirent.h>
 
 #ifdef ANDROID
 #include <sys/system_properties.h>
@@ -206,10 +207,48 @@ int KernelBase::UpdateCpuTemp()
     return 0;
 }
 
+// /sys/class/devfreq/xxxxxxxx.gpu
+static void FindGpuNode(char* nodename)
+{
+    DIR *dir;
+    struct dirent *ptr;
+
+    if ((dir=opendir("/sys/class/devfreq")) == NULL)
+    {
+        return;
+    }
+
+    while ((ptr=readdir(dir)) != NULL) {
+        if (strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0)
+            continue;
+        if (ptr->d_type == DT_LNK && strstr(ptr->d_name, ".gpu") != NULL) {
+            sprintf(nodename, "/sys/class/devfreq/%s", ptr->d_name);
+            break;
+        }
+    }
+}
+
 int KernelBase::UpdateGpu()
 {
-    ReadFListValue(gpu_freq_list, &gpu_freq_);
-    ReadFListValue(gpu_load_list, &gpu_load_);
+    if (ReadFListValue(gpu_freq_list, &gpu_freq_) < 0 ) {
+        char gpu_path[128] = "\0";
+        FindGpuNode(gpu_path);
+        if (gpu_path[0]) {
+            strcat(gpu_path, "/cur_freq");
+            ReadFileValue(gpu_path, &gpu_freq_);
+            gpu_freq_ /= 1000;
+        }
+    }
+
+    if (ReadFListValue(gpu_load_list, &gpu_load_) < 0 ) {
+        char gpu_path[128] = "\0";
+        FindGpuNode(gpu_path);
+        if (gpu_path[0]) {
+            strcat(gpu_path, "/load");
+            ReadFileValue(gpu_path, &gpu_load_);
+        }
+    }
+
     ReadFListValue(gpu_temp_list, &gpu_temp_);
 
     return 0;

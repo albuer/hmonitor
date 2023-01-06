@@ -7,13 +7,9 @@ void KernelBase::InitNode_4_4()
     cpu_temp_list.push_back(Node("/sys/class/thermal/thermal_zone0/temp"));
 
     // GPU FREQ (KHz)
-    gpu_freq_list.push_back(Node("/sys/class/devfreq/ff9a0000.gpu/cur_freq", NULL, 1000)); // rk3399
-    gpu_freq_list.push_back(Node("/sys/class/devfreq/ffa30000.gpu/cur_freq", NULL, 1000)); // rk3288
     gpu_freq_list.push_back(Node("/sys/class/devfreq/ffa30000.rogue-g6110/cur_freq", NULL, 1000)); // rk3368
 
     // GPU LOAD
-    gpu_load_list.push_back(Node("/sys/class/devfreq/ff9a0000.gpu/load")); // rk3399
-    gpu_load_list.push_back(Node("/sys/class/devfreq/ffa30000.gpu/load")); // rk3288
     gpu_load_list.push_back(Node("/sys/class/devfreq/ffa30000.rogue-g6110/load")); // rk3368
 
     // GPU TEMP
