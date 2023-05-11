@@ -24,21 +24,21 @@ int ReadFileAll(const char* filename, char* content, int len)
 /*
    返回值： 从文件中读取到的字节数； < 0 表示失败
  */
-int ReadFileValue(const char* filename, int *result)
+int ReadFileValue(const char* filename, uint64_t *result)
 {
     char content[128] = "";
     int ret = ReadFileAll(filename, content, sizeof(content)-1);
 
     if (ret >= 0) {
-        *result = atoi(content);
+        *result = strtoul(content, NULL, 10);
     }
 
     return ret;
 }
 
-int ReadFileValue(Node& node, int *result)
+int ReadFileValue(Node& node, uint64_t *result)
 {
-    long long value = 0;
+    uint64_t value = 0;
     char content[128] = "";
     int ret = ReadFileAll(node.node, content, sizeof(content)-1);
 
@@ -47,14 +47,14 @@ int ReadFileValue(Node& node, int *result)
             char*ptr = strstr(content, node.key);
             if (ptr != NULL) {
                 ptr += strlen(node.key);
-                value = atoll(content);
+                value = strtoul(content, NULL, 10);
             }
         } else {
-            value = atoll(content);
+            value = strtoul(content, NULL, 10);
         }
     }
 
-    *result = (int)(value / node.factor);
+    *result = value / node.factor;
 
     return ret;
 }
@@ -64,7 +64,7 @@ int ReadFileValue(Node& node, int *result)
      < 0  所有文件都不存在，或不可读
      >=0  存在的文件的序号
  */
-int ReadFListValue(std::vector<Node>& filelist, int *result)
+int ReadFListValue(std::vector<Node>& filelist, uint64_t *result)
 {
     int ret = -1;
 
@@ -75,6 +75,21 @@ int ReadFListValue(std::vector<Node>& filelist, int *result)
             break;
         }
     }
+
+    return ret;
+}
+
+/*
+   返回值： 写入文件的字节数； < 0 表示失败
+ */
+int WriteFileAll(const char* filename, const char* content)
+{
+    int fd = open(filename, O_WRONLY);
+    if (fd < 0)
+        return -1;
+
+    int ret = write(fd, content, strlen(content));
+    close(fd);
 
     return ret;
 }

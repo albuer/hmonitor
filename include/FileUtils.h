@@ -4,6 +4,12 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <dirent.h>
+#include <unistd.h>
+
+#ifndef MAX_PATH
+#define MAX_PATH    1024
+#endif
 
 class Node
 {
@@ -28,8 +34,9 @@ public:
 };
 
 int ReadFileAll(const char* filename, char* content, int len);
-int ReadFileValue(const char* filename, int *result);
-int ReadFileValue(Node& node, int *result);
-int ReadFListValue(std::vector<Node>& filelist, int *result);
+int ReadFileValue(const char* filename, uint64_t *result);
+int ReadFileValue(Node& node, uint64_t *result);
+int ReadFListValue(std::vector<Node>& filelist, uint64_t *result);
+int WriteFileAll(const char* filename, const char* content);
 
 #endif
